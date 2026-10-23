@@ -1,0 +1,21 @@
+{
+  "url": "https://example.com",
+  "status": 200,
+  "response_time_s": 0.846,
+  "content_type": "text/html; charset=utf-8",
+  "title": "Example Domain",
+  "meta_description": "",
+  "h1": [],
+  "h2_count": 0,
+  "canonical": null,
+  "robots_meta": "",
+  "meta": {},
+  "json_ld_blocks": 0,
+  "json_ld_types": [],
+  "images": 0,
+  "images_with_alt": 0,
+  "links_internal_bucket": 0,
+  "links_external_bucket": 0,
+  "word_count": 27,
+  "score": 33
+}
