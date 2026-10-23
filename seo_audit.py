@@ -23,7 +23,7 @@ import urllib.error
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
-UA = "seo-audit-cli/1.0 (+https://github.com/shahkooh/seo-audit-cli)"
+UA = "seo-audit-cli/1.0 (+https://github.com/mohammad-abbasi-sh/seo-audit-cli)"
 
 
 class PageParser(HTMLParser):
