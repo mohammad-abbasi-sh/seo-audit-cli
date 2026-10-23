@@ -46,6 +46,6 @@ python -m unittest discover -s tests
 
 ## Why I built this
 
-I'm an SEO manager. I run this shape of check by hand every week — so I turned it into a tool. Part of my [12 projects in 12 weeks](https://github.com/shahkooh) series: SEO × AI, built in public.
+I'm an SEO manager. I run this shape of check by hand every week — so I turned it into a tool. Part of my [12 projects in 12 weeks](https://github.com/mohammad-abbasi-sh) series: SEO × AI, built in public.
 
 MIT — see [LICENSE](LICENSE).
