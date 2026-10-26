@@ -1,5 +1,7 @@
 # seo-audit-cli
 
+[🇮🇷 توضیحات فارسی](README-fa.md)
+
 **A zero-dependency technical SEO audit for any URL — one command, one score.**
 
 ```bash
