@@ -5,7 +5,13 @@
 ```bash
 python seo_audit.py https://example.com
 python seo_audit.py https://example.com --json -o report.json
+python seo_audit.py --sitemap https://example.com/sitemap.xml
+python seo_audit.py --sitemap https://example.com/sitemap.xml --json -o sitemap-report.json
 ```
+
+حالت Sitemap تا ۲۰ URL از یک `sitemap.xml` را ممیزی می‌کند (ایندکس
+sitemap هم دنبال می‌شود)، برای هر URL یک امتیاز چاپ می‌کند و میانگین را
+نشان می‌دهد؛ اگر یک صفحه خراب باشد، بقیه همچنان بررسی می‌شوند.
 
 بدون `pip install`، بدون API key. فقط استانداردلایب پایتون ۳٫۱۰ به بالا.
 
@@ -40,7 +46,7 @@ python -m unittest discover -s tests
 
 ## نقشه راه
 
-- [ ] حالت Sitemap: ممیزی همه URLهای یک `sitemap.xml`
+- [x] حالت Sitemap: ممیزی همه URLهای یک `sitemap.xml` (تا ۲۰ URL در هر اجرا)
 - [ ] حالت دسته‌ای از روی یک CSV شامل URLها
 - [ ] Core Web Vitals از طریق PageSpeed Insights API (با کلید اختیاری)
 

@@ -7,7 +7,13 @@
 ```bash
 python seo_audit.py https://example.com
 python seo_audit.py https://example.com --json -o report.json
+python seo_audit.py --sitemap https://example.com/sitemap.xml
+python seo_audit.py --sitemap https://example.com/sitemap.xml --json -o sitemap-report.json
 ```
+
+Sitemap mode audits up to 20 URLs from a `sitemap.xml` (a sitemap index
+is followed too), prints one score per URL plus the average, and keeps
+going when a single page fails.
 
 No `pip install`, no API key. Python 3.10+ standard library only.
 
@@ -42,7 +48,7 @@ python -m unittest discover -s tests
 
 ## Roadmap
 
-- [ ] Sitemap mode: audit every URL in a `sitemap.xml`
+- [x] Sitemap mode: audit every URL in a `sitemap.xml` (up to 20 URLs per run)
 - [ ] Batch mode from a CSV of URLs
 - [ ] Core Web Vitals via the PageSpeed Insights API (optional key)
 
