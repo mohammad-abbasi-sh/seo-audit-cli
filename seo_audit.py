@@ -5,10 +5,15 @@ Usage:
     python seo_audit.py https://example.com
     python seo_audit.py https://example.com --json
     python seo_audit.py https://example.com --json -o report.json
+    python seo_audit.py --sitemap https://example.com/sitemap.xml
+    python seo_audit.py --sitemap https://example.com/sitemap.xml --json -o sitemap-report.json
 
 Checks: HTTP status & timing, title, meta description, H1, canonical,
 robots meta, Open Graph, JSON-LD structured data, image alt coverage,
 internal/external links and word count. Prints a 0-100 score.
+Sitemap mode audits up to 20 URLs from a sitemap.xml (or a sitemap
+index, whose child sitemaps are followed until 20 URLs are collected)
+and prints one score per URL plus the average.
 Only Python's standard library is used — nothing to install.
 """
 from __future__ import annotations
@@ -20,10 +25,13 @@ import sys
 import time
 import urllib.request
 import urllib.error
+import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
 UA = "seo-audit-cli/1.0 (+https://github.com/mohammad-abbasi-sh/seo-audit-cli)"
+SITEMAP_LIMIT = 20
+SITEMAP_INDEX_CHILD_LIMIT = 10
 
 
 class PageParser(HTMLParser):
@@ -163,6 +171,94 @@ def audit(url: str) -> dict:
     return report
 
 
+def _localname(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def parse_sitemap(xml_text: str, limit: int = SITEMAP_LIMIT) -> list[str]:
+    """Extract up to `limit` URLs from a sitemap XML document.
+
+    Namespace-agnostic: matches any <loc> element, so it works for both
+    <urlset> and <sitemapindex> documents (for an index, the returned
+    URLs are the child sitemaps, resolved by fetch_sitemap_urls).
+    Raises xml.etree.ElementTree.ParseError on malformed XML.
+    """
+    root = ET.fromstring(xml_text)
+    urls: list[str] = []
+    for el in root.iter():
+        if _localname(el.tag) == "loc" and (el.text or "").strip():
+            urls.append(el.text.strip())
+            if len(urls) >= limit:
+                break
+    return urls
+
+
+def fetch_sitemap_urls(sitemap_url: str, limit: int = SITEMAP_LIMIT, _depth: int = 0) -> list[str]:
+    """Fetch a sitemap and return up to `limit` page URLs from it.
+
+    A sitemap index is followed: its child sitemaps are fetched in order
+    (at most SITEMAP_INDEX_CHILD_LIMIT) until `limit` page URLs are
+    collected. A child that fails to fetch is skipped, not fatal.
+    """
+    status, _headers, body, _elapsed = fetch(sitemap_url)
+    if status != 200:
+        raise ValueError(f"sitemap returned HTTP {status}: {sitemap_url}")
+    root = ET.fromstring(body)
+    if _localname(root.tag) == "sitemapindex" and _depth == 0:
+        urls: list[str] = []
+        for child in parse_sitemap(body, SITEMAP_INDEX_CHILD_LIMIT):
+            if len(urls) >= limit:
+                break
+            try:
+                urls.extend(fetch_sitemap_urls(child, limit - len(urls), _depth + 1))
+            except (urllib.error.URLError, ValueError, ET.ParseError):
+                continue
+        return urls[:limit]
+    return parse_sitemap(body, limit)
+
+
+def audit_sitemap(sitemap_url: str, limit: int = SITEMAP_LIMIT) -> dict:
+    """Audit every URL in a sitemap (up to `limit`) and summarise.
+
+    A URL that fails to fetch gets an {"url", "error"} entry instead of
+    a report, so one dead page never aborts the whole run.
+    """
+    urls = fetch_sitemap_urls(sitemap_url, limit)
+    results: list[dict] = []
+    failed = 0
+    for u in urls:
+        try:
+            results.append(audit(u))
+        except (urllib.error.URLError, ValueError) as e:
+            results.append({"url": u, "error": f"{type(e).__name__}: {e}"})
+            failed += 1
+    scored = [r["score"] for r in results if "score" in r]
+    return {
+        "sitemap": sitemap_url,
+        "urls": urls,
+        "results": results,
+        "total": len(urls),
+        "audited": len(scored),
+        "failed": failed,
+        "average_score": round(sum(scored) / len(scored), 1) if scored else None,
+    }
+
+
+def print_sitemap_summary(s: dict) -> None:
+    print(f"\nSitemap Audit — {s['sitemap']}")
+    print("=" * 64)
+    for r in s["results"]:
+        if "score" in r:
+            print(f"  {r['score']:>3}/100  {r['url']}")
+        else:
+            print(f"  ERR     {r['url']}  ({r['error']})")
+    print("=" * 64)
+    line = f"Audited {s['audited']} of {s['total']} URLs, {s['failed']} failed"
+    if s["average_score"] is not None:
+        line += f", average score {s['average_score']}/100"
+    print(line)
+
+
 def print_human(r: dict) -> None:
     print(f"\nSEO Audit — {r['url']}")
     print("=" * 64)
@@ -180,23 +276,32 @@ def print_human(r: dict) -> None:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="Zero-dependency technical SEO audit for one URL.")
-    ap.add_argument("url", help="URL to audit, e.g. https://example.com")
+    ap = argparse.ArgumentParser(description="Zero-dependency technical SEO audit for one URL or a whole sitemap.")
+    ap.add_argument("url", nargs="?", help="URL to audit, e.g. https://example.com")
+    ap.add_argument("--sitemap", metavar="URL", help="audit up to 20 URLs from a sitemap.xml instead of one URL")
     ap.add_argument("--json", action="store_true", help="print JSON instead of a table")
     ap.add_argument("-o", "--output", help="also write the JSON report to this file")
     args = ap.parse_args(argv)
+    if bool(args.url) == bool(args.sitemap):
+        ap.error("pass exactly one of URL or --sitemap")
     try:
-        r = audit(args.url)
-    except (urllib.error.URLError, ValueError) as e:
-        print(f"Error: could not fetch {args.url}: {e}", file=sys.stderr)
+        if args.sitemap:
+            summary = audit_sitemap(args.sitemap)
+        else:
+            summary = audit(args.url)
+    except (urllib.error.URLError, ValueError, ET.ParseError) as e:
+        target = args.sitemap or args.url
+        print(f"Error: could not fetch {target}: {e}", file=sys.stderr)
         return 1
     if args.json:
-        print(json.dumps(r, indent=2, ensure_ascii=False))
+        print(json.dumps(summary, indent=2, ensure_ascii=False))
+    elif args.sitemap:
+        print_sitemap_summary(summary)
     else:
-        print_human(r)
+        print_human(summary)
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
-            json.dump(r, f, indent=2, ensure_ascii=False)
+            json.dump(summary, f, indent=2, ensure_ascii=False)
         print(f"Report written to {args.output}")
     return 0
 
